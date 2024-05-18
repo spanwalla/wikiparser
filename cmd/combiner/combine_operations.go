@@ -11,17 +11,17 @@ import (
 )
 
 type Links struct {
-	incomingLinks []int
-	outgoingLinks []int
+	incomingLinks []uint32
+	outgoingLinks []uint32
 }
 
-func convertIntSliceToString(slice []int, sep string) string {
+func convertIntSliceToString(slice []uint32, sep string) string {
 	var sb strings.Builder
 	for i, num := range slice {
 		if i > 0 {
 			sb.WriteString(sep)
 		}
-		sb.WriteString(strconv.Itoa(num))
+		sb.WriteString(strconv.Itoa(int(num)))
 	}
 	if len(slice) == 0 {
 		sb.WriteString("-")
@@ -29,7 +29,7 @@ func convertIntSliceToString(slice []int, sep string) string {
 	return sb.String()
 }
 
-func addLink(pageLinks map[int]Links, sourcePageId, targetPageId int) {
+func addLink(pageLinks map[uint32]Links, sourcePageId, targetPageId uint32) {
 	pl, ok := pageLinks[sourcePageId]
 	if !ok {
 		pl = Links{}
@@ -81,7 +81,7 @@ func CombineLinks(pageLinksPath string, silent bool) error {
 		}
 	}(writer) // flush buffer before return
 
-	pageLinks := make(map[int]Links)
+	pageLinks := make(map[uint32]Links)
 
 	bar := pb.New64(0)
 	bar.ShowElapsedTime = true
@@ -100,7 +100,7 @@ func CombineLinks(pageLinksPath string, silent bool) error {
 			return err
 		}
 
-		addLink(pageLinks, sourcePageId, targetPageId)
+		addLink(pageLinks, uint32(sourcePageId), uint32(targetPageId))
 		bar.Increment()
 	}
 
@@ -110,7 +110,7 @@ func CombineLinks(pageLinksPath string, silent bool) error {
 	}
 
 	for pageId, links := range pageLinks {
-		_, err = writer.WriteString(strconv.Itoa(pageId) + "\t" + convertIntSliceToString(links.incomingLinks, ",") + "\t" + convertIntSliceToString(links.outgoingLinks, ",") + "\n")
+		_, err = writer.WriteString(strconv.Itoa(int(pageId)) + "\t" + convertIntSliceToString(links.incomingLinks, ",") + "\t" + convertIntSliceToString(links.outgoingLinks, ",") + "\n")
 		if err != nil {
 			fmt.Println("Error writing file:", err)
 			return err
