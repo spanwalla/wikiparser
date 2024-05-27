@@ -10,6 +10,7 @@ import (
 func main() {
 	input := flag.String("input", "", "path to the input file, required")
 	page := flag.String("page", "", "path to the '*-page.sql.csv' file, required for 'replace' mode")
+	redirect := flag.String("redirect", "", "path to the '*-redirect.sql.csv' file, required for 'replace' mode")
 	mode := flag.String("mode", "", "mode to use [parse/replace/combine], required")
 	silent := flag.Bool("silent", false, "silent mode, turn off the progress bar, optional")
 
@@ -30,7 +31,7 @@ func main() {
 			flag.Usage()
 			return
 		}
-		err := replacer.ReplaceTitleToId(*page, *input, *silent)
+		err := replacer.ReplaceTitleToId(*page, *redirect, *input, *silent)
 		if err != nil {
 			return
 		}

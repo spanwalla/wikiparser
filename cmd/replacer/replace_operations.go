@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"github.com/cheggaaa/pb"
 	"os"
+	"strconv"
 	"strings"
 )
 
-func fillTitleToIdDict(fileName string, silent bool) (map[string]string, error) {
+func createTitleToIdDict(fileName string, silent bool) (map[string]uint32, error) {
 	file, err := os.Open(fileName)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
@@ -21,7 +22,7 @@ func fillTitleToIdDict(fileName string, silent bool) (map[string]string, error) 
 		}
 	}(file)
 
-	pageInfo := make(map[string]string)
+	pageInfo := make(map[string]uint32)
 	scanner := bufio.NewScanner(file)
 	bar := pb.New64(0)
 	bar.ShowElapsedTime = true
@@ -32,7 +33,12 @@ func fillTitleToIdDict(fileName string, silent bool) (map[string]string, error) 
 	for scanner.Scan() {
 		line := scanner.Text()
 		data := strings.Split(line, "\t")
-		pageInfo[data[1]] = data[0] // pageInfo[title] = id
+		pageId, err := strconv.Atoi(data[0])
+		if err != nil {
+			fmt.Println("Error converting line to int:", data, err)
+			return nil, err
+		}
+		pageInfo[data[1]] = uint32(pageId) // pageInfo[title] = id
 		bar.Increment()
 	}
 
@@ -44,8 +50,54 @@ func fillTitleToIdDict(fileName string, silent bool) (map[string]string, error) 
 	return pageInfo, nil
 }
 
-func ReplaceTitleToId(pagePath string, currentPath string, silent bool) error {
-	tempFilePath, err := createTempFileAndProcessData(pagePath, currentPath, silent)
+func createRedirectDict(fileName string, pageInfo map[string]uint32, silent bool) (map[uint32]uint32, error) {
+	file, err := os.Open(fileName)
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return nil, err
+	}
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			fmt.Println("Error closing file:", err)
+		}
+	}(file)
+
+	redirectInfo := make(map[uint32]uint32)
+	scanner := bufio.NewScanner(file)
+	bar := pb.New64(0)
+	bar.ShowElapsedTime = true
+	bar.ShowSpeed = true
+	bar.NotPrint = silent
+	bar.Start()
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		data := strings.Split(line, "\t")
+		sourcePageId, err := strconv.Atoi(data[0])
+		if err != nil {
+			fmt.Println("Error converting line to int:", data, err)
+			return nil, err
+		}
+		targetPageId, ok := pageInfo[data[1]]
+		if !ok {
+			continue
+		}
+
+		redirectInfo[uint32(sourcePageId)] = targetPageId
+		bar.Increment()
+	}
+
+	bar.Finish()
+	if err := scanner.Err(); err != nil {
+		fmt.Println("Error scanner:", err)
+		return nil, err
+	}
+	return redirectInfo, nil
+}
+
+func ReplaceTitleToId(pagePath string, redirectPath string, currentPath string, silent bool) error {
+	tempFilePath, err := createTempFileAndProcessData(pagePath, redirectPath, currentPath, silent)
 	if err != nil {
 		return err
 	}
@@ -58,7 +110,7 @@ func ReplaceTitleToId(pagePath string, currentPath string, silent bool) error {
 	return nil
 }
 
-func createTempFileAndProcessData(pagePath string, currentPath string, silent bool) (string, error) {
+func createTempFileAndProcessData(pagePath, redirectPath, linksPath string, silent bool) (string, error) {
 	tempFile, err := os.CreateTemp("", "tempfile.*.csv")
 	if err != nil {
 		fmt.Println("Error creating tempfile:", err)
@@ -71,7 +123,7 @@ func createTempFileAndProcessData(pagePath string, currentPath string, silent bo
 		}
 	}(tempFile)
 
-	file, err := os.Open(currentPath)
+	file, err := os.Open(linksPath)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		return "", err
@@ -83,7 +135,12 @@ func createTempFileAndProcessData(pagePath string, currentPath string, silent bo
 		}
 	}(file) // close before return
 
-	pageInfo, err := fillTitleToIdDict(pagePath, silent)
+	pageInfo, err := createTitleToIdDict(pagePath, silent)
+	if err != nil {
+		return "", err
+	}
+
+	redirectInfo, err := createRedirectDict(redirectPath, pageInfo, silent)
 	if err != nil {
 		return "", err
 	}
@@ -111,7 +168,12 @@ func createTempFileAndProcessData(pagePath string, currentPath string, silent bo
 		if !ok {
 			continue
 		}
-		data[1] = pageId
+
+		// replace redirect target page to page which its redirect
+		if redirectTo, ok := redirectInfo[pageId]; ok {
+			pageId = redirectTo
+		}
+		data[1] = strconv.Itoa(int(pageId))
 
 		_, err = writer.WriteString(strings.Join(data, "\t") + "\n")
 		if err != nil {
