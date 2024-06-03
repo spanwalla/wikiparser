@@ -5,13 +5,14 @@ import (
 	"wikiparser/cmd/combiner"
 	"wikiparser/cmd/parser"
 	"wikiparser/cmd/replacer"
+	"wikiparser/cmd/validator"
 )
 
 func main() {
 	input := flag.String("input", "", "path to the input file, required")
 	page := flag.String("page", "", "path to the '*-page.sql.csv' file, required for 'replace' mode")
-	redirect := flag.String("redirect", "", "path to the '*-redirect.sql.csv' file, required for 'replace' mode")
-	mode := flag.String("mode", "", "mode to use [parse/replace/combine], required")
+	redirect := flag.String("redirect", "", "path to the '*-redirect.sql.csv' file, required for 'validate' mode")
+	mode := flag.String("mode", "", "mode to use [parse/replace/combine/validate], required")
 	silent := flag.Bool("silent", false, "silent mode, turn off the progress bar, optional")
 
 	flag.Parse()
@@ -31,7 +32,16 @@ func main() {
 			flag.Usage()
 			return
 		}
-		err := replacer.ReplaceTitleToId(*page, *redirect, *input, *silent)
+		err := replacer.ReplaceTitleToId(*page, *input, *silent)
+		if err != nil {
+			return
+		}
+	} else if *mode == "validate" {
+		if len(*redirect) == 0 {
+			flag.Usage()
+			return
+		}
+		err := validator.ReplaceRedirect(*input, *redirect, *silent)
 		if err != nil {
 			return
 		}
