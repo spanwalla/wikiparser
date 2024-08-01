@@ -1,4 +1,4 @@
-package combiner
+package combine
 
 import (
 	"bufio"
@@ -8,44 +8,31 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"wikiparser/internal/pkg/convert"
 )
 
-type Links struct {
+type RelatedLinks struct {
 	incomingLinks []uint32
 	outgoingLinks []uint32
 }
 
-func convertIntSliceToString(slice []uint32, sep string) string {
-	var sb strings.Builder
-	for i, num := range slice {
-		if i > 0 {
-			sb.WriteString(sep)
-		}
-		sb.WriteString(strconv.Itoa(int(num)))
-	}
-	if len(slice) == 0 {
-		sb.WriteString("-")
-	}
-	return sb.String()
-}
-
-func addLink(pageLinks map[uint32]Links, sourcePageId, targetPageId uint32) {
+func addLink(pageLinks map[uint32]RelatedLinks, sourcePageId, targetPageId uint32) {
 	pl, ok := pageLinks[sourcePageId]
 	if !ok {
-		pl = Links{}
+		pl = RelatedLinks{}
 	}
 	pl.outgoingLinks = append(pl.outgoingLinks, targetPageId)
 	pageLinks[sourcePageId] = pl
 
 	pl, ok = pageLinks[targetPageId]
 	if !ok {
-		pl = Links{}
+		pl = RelatedLinks{}
 	}
 	pl.incomingLinks = append(pl.incomingLinks, sourcePageId)
 	pageLinks[targetPageId] = pl
 }
 
-func CombineLinks(pageLinksPath string, silent bool) error {
+func Links(pageLinksPath string, silent bool) error {
 	linksFile, err := os.Open(pageLinksPath)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
@@ -81,7 +68,7 @@ func CombineLinks(pageLinksPath string, silent bool) error {
 		}
 	}(writer) // flush buffer before return
 
-	pageLinks := make(map[uint32]Links)
+	pageLinks := make(map[uint32]RelatedLinks)
 
 	bar := pb.New64(0)
 	bar.ShowElapsedTime = true
@@ -110,7 +97,7 @@ func CombineLinks(pageLinksPath string, silent bool) error {
 	}
 
 	for pageId, links := range pageLinks {
-		_, err = writer.WriteString(strconv.Itoa(int(pageId)) + "\t" + convertIntSliceToString(links.incomingLinks, ",") + "\t" + convertIntSliceToString(links.outgoingLinks, ",") + "\n")
+		_, err = writer.WriteString(strconv.Itoa(int(pageId)) + "\t" + convert.Uint32SliceToString(links.incomingLinks, ",") + "\t" + convert.Uint32SliceToString(links.outgoingLinks, ",") + "\n")
 		if err != nil {
 			fmt.Println("Error writing file:", err)
 			return err
